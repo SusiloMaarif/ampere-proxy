@@ -1,9 +1,10 @@
 const express = require('express');
 const axios = require('axios');
 const app = express();
+
 const PORT = process.env.PORT || 8090;
 
-// Load tokens from env var (TOKENS) atau file tokens.txt
+// Load tokens
 let tokens = [];
 if (process.env.TOKENS) {
   tokens = process.env.TOKENS.split('\n').map(t => t.trim()).filter(t => t);
@@ -20,13 +21,13 @@ if (process.env.TOKENS) {
 }
 
 if (tokens.length === 0) {
-  console.error('❌ No tokens found! Set TOKENS env or create tokens.txt');
+  console.error('❌ ERROR: No tokens found! Set TOKENS env variable.');
   process.exit(1);
 }
 
-let currentIndex = 0;
+console.log(`✅ Loaded ${tokens.length} tokens`);
 
-// Round-robin token picker
+let currentIndex = 0;
 function getNextToken() {
   currentIndex = (currentIndex + 1) % tokens.length;
   return tokens[currentIndex];
@@ -34,18 +35,10 @@ function getNextToken() {
 
 app.use(express.json());
 
-// Dashboard (optional)
 app.get('/', (req, res) => {
-  res.send(`
-    <html><body style="background:#0d1117;color:#c9d1d9;font-family:monospace;padding:20px;">
-      <h1 style="color:#58a6ff;">⚡️ Ampere Proxy</h1>
-      <p>Active tokens: <strong style="color:#3fb950;">${tokens.length}</strong></p>
-      <p>Visit <a href="https://railway.app" style="color:#58a6ff;">Railway</a> for logs.</p>
-    </body></html>
-  `);
+  res.json({ status: 'ok', tokens: tokens.length, currentIndex });
 });
 
-// Proxy endpoint: OpenAI-compatible
 app.post('/v1/chat/completions', async (req, res) => {
   const token = getNextToken();
   try {
@@ -55,14 +48,13 @@ app.post('/v1/chat/completions', async (req, res) => {
     });
     res.json(response.data);
   } catch (error) {
-    console.error(`❌ Error: ${error.message}`);
+    console.error(`❌ Token error: ${error.message}`);
     res.status(500).json({ error: 'Proxy error', details: error.message });
   }
 });
 
-// Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', tokens: tokens.length }));
 
-app.listen(PORT, () => {
-  console.log(`⚡️ Ampere Proxy running on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`⚡️ Proxy running on port ${PORT}`);
 });
